@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "A nodejs project that extract data from a mysql base to a json file, it will treat some data patterns that are wrong and take that json file treated and convert to a CSV file.",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },

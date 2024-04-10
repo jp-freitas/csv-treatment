@@ -1,16 +1,7 @@
-const mysql = require("mysql");
-const fs = require("fs");
-const cheerio = require("cheerio");
+import { writeFile, readFile, existsSync, mkdirSync } from 'node:fs';
+import { load } from 'cheerio';
 
-/**
- * Creating the connection with the database
- */
-const connection = mysql.createConnection({
-  host: "your_host",
-  user: "your_username",
-  password: "your_password",
-  database: "your_database",
-});
+import { connection } from './utils/connection.js';
 
 /**
  * Defining the Group Concat Max Lenght
@@ -21,7 +12,7 @@ const groupConcatMaxLength = 90000;
  */
 const query = `SELECT DISTINCT 'Unimed Regional Sul Goiás' as SINGULAR, 'Clinica SELF' as UNIDADE, '175' AS PK_ORGANIZACAO, C.CODIGO AS ID_CONTATO, AH.protocolo AS ID_ATENDIMENTO, AH.DATA AS DATA_ATENDIMENTO, 'CRM' AS NOME_CONSELHO, F.NOME AS NOME_PROFISSIONAL, FC.UF_CONSELHO AS UF_CONSELHO, FC.REGISTRO_CONSELHO AS  NUMERO_CONSELHO, GROUP_CONCAT(CPD.descricao_resposta) AS SOAPS, '' AS CIAP1, '' AS CIAP2, '' AS CIAP3, '' AS CIAP4, '' AS CIAP5, '' AS CIAP6, '' AS SOAPO, '' AS SOAPA, '' AS CID1, '' AS CID2,'' AS CID3, '' AS CID4, '' AS DIAGNOSTICO, '' AS SOAPP, GROUP_CONCAT(RC.texto_receita) AS RECEITUARIO FROM mastersys_ciame.cliente C INNER JOIN mastersys_ciame.ato_hospitalar AH ON AH.cliente = C.codigo LEFT JOIN mastersys_ciame.funcionario F ON AH.profissional = F.CODIGO LEFT JOIN mastersys_ciame.funcionario_conselho FC ON FC.funcionario = F.CODIGO INNER JOIN mastersys_ciame.cliente_prontuario_anamnese CP ON CP.ato_hospitalar = AH.codigo LEFT JOIN mastersys_ciame.cliente_prontuario_anamnese_detalhe CPD ON CPD.cliente_prontuario_anamnese = CP.codigo LEFT JOIN mastersys_ciame.anamnese A ON CP.anamnese = A.codigo LEFT JOIN mastersys_ciame.anamnese_perguntas AP ON CPD.anamnese_perguntas = AP.codigo LEFT JOIN mastersys_ciame.anamnese_respostas AR ON CPD.anamnese_respostas = AR.codigo LEFT JOIN mastersys_ciame.cliente_prontuario_receita RC ON RC.ATO_HOSPITALAR = AH.CODIGO WHERE F.CODIGO = 1 AND AH.SITUACAO <> 'CANCELADO' AND AH.DATA >= '2023-11-01 00:00:00' GROUP BY C.CODIGO, AH.protocolo, AH.DATA, F.NOME, FC.UF_CONSELHO, FC.REGISTRO_CONSELHO;`;
 
-connection.connect((err) => {
+connection().connect((err) => {
   if (err) {
     console.error("Error connecting to database:", err);
     return;
@@ -31,7 +22,7 @@ connection.connect((err) => {
   /**
    * Performing a SESSION to increase the lenght of the group concat.
    */
-  connection.query(
+  connection().query(
     `SET SESSION group_concat_max_len = ${groupConcatMaxLength};`,
     (err) => {
       if (err) throw err;
@@ -43,7 +34,7 @@ connection.connect((err) => {
   /**
    * Performing the query to retrieve data from database.
    */
-  connection.query(query, (err, results) => {
+  connection().query(query, (err, results) => {
     if (err) {
       console.error("Error executing query:", err);
       return;
@@ -51,7 +42,7 @@ connection.connect((err) => {
     console.log("Query results:", results);
 
     // Write results to a JSON file
-    fs.writeFile("query_results.json", JSON.stringify(results), (err) => {
+    writeFile("query_results.json", JSON.stringify(results), (err) => {
       if (err) {
         console.error("Error writing to JSON file:", err);
         return;
@@ -74,7 +65,7 @@ connection.connect((err) => {
       return csv;
     }
 
-    fs.readFile("./query_results.json", "utf-8", (err, data) => {
+    readFile("./query_results.json", "utf-8", (err, data) => {
       if (err) throw err;
       let jsonData;
       /**
@@ -90,7 +81,7 @@ connection.connect((err) => {
        */
       for (let key in jsonData) {
         const soapsValue = jsonData[key].SOAPS;
-        const cleanedSoaps = cheerio.load(soapsValue).text();
+        const cleanedSoaps = load(soapsValue).text();
         jsonData[key].SOAPS = cleanedSoaps;
       }
 
@@ -106,7 +97,7 @@ connection.connect((err) => {
       /**
        * Write the data again in the JSON file.
        */
-      fs.writeFile(
+      writeFile(
         `query_results.json`,
         JSON.stringify(jsonData, null, 2),
         "utf-8",
@@ -119,14 +110,14 @@ connection.connect((err) => {
       /**
        * Read the JSON file to convert all the data into CSV.
        */
-      fs.readFile("./query_results.json", "utf-8", (err, data) => {
+      readFile("./query_results.json", "utf-8", (err, data) => {
         if (err) throw err;
         const jsonData = JSON.parse(data);
         const csvData = convertToCSV(jsonData);
         /**
          * Write the CSV file using the data converted using the above function.
          */
-        fs.writeFile("data.csv", csvData, "utf-8", (err) => {
+        writeFile("data.csv", csvData, "utf-8", (err) => {
           if (err) throw err;
           console.log("CSV saved in data.csv file!");
         });
@@ -135,5 +126,5 @@ connection.connect((err) => {
   });
 
   // Close the connection
-  connection.end();
+  connection().end();
 });

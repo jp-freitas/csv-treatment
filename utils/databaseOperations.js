@@ -1,19 +1,31 @@
 import { connection } from './connection.js';
-import { jsonDataFromDatabase } from './fileOperations.js';
+import { jsonDataFromDatabase, treatDataAndSaveInCSV } from './fileOperations.js';
+
+export function showDatabases(query) {
+  return new Promise((resolve, reject) => {
+    connection().query(
+      query,
+      (err, databases) => {
+        if (err) {
+          reject(err);
+        }
+        resolve(databases)
+      }
+    );
+  });
+}
 
 export function queryDoctor(query, selectedDatabase) {
   return new Promise((resolve, reject) => {
     connection(selectedDatabase).query(
       query,
-      (err, results) => {
+      (err, doctors) => {
         if (err) {
           reject(err);
         }
-        resolve(results);
+        resolve(doctors);
       }
     );
-    // Close the connection
-    connection(selectedDatabase).end();
   });
 }
 
@@ -32,18 +44,18 @@ export function queryDataByDoctor(query, selectedDatabase, doctorName) {
         /**
          * Performing the query to retrieve data from database.
          */
-        connection(selectedDatabase).query(query, (err, results) => {
+        connection(selectedDatabase).query(query, async (err, doctorMedicalRecord) => {
           if (err) {
             console.error("Error executing query:", err);
             reject(err);
             return;
           }
-          console.log("Query results:", results.length);
-          jsonDataFromDatabase(results, selectedDatabase, doctorName);
-          resolve(results);
-          // Close the connection
-          connection(selectedDatabase).end();
+          console.log("Query results:", doctorMedicalRecord.length);
+          await jsonDataFromDatabase(doctorMedicalRecord, selectedDatabase, doctorName);
+          await treatDataAndSaveInCSV(doctorName, selectedDatabase);
+          resolve(doctorMedicalRecord);
         });
+        connection().end();
       }
     );
   });

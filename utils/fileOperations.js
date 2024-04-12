@@ -1,5 +1,7 @@
-import { writeFile, readFile } from 'node:fs';
+import { writeFile, readFile } from 'node:fs/promises';
 import { load } from 'cheerio';
+
+import { convertToCSV } from './convertToCSV.js';
 import { verifyDestinationPath } from './verifyDestinationPath.js';
 
 /**
@@ -8,24 +10,29 @@ import { verifyDestinationPath } from './verifyDestinationPath.js';
  */
 export async function jsonDataFromDatabase(results, selectedDatabase, doctorName) {
   await verifyDestinationPath(selectedDatabase);
-  writeFile(`./files/${selectedDatabase}/query_${doctorName.toLowerCase()}.json`, JSON.stringify(results), (err) => {
-    if (err) {
-      console.error('Error while writing to JSON file:', err);
-        return;
-      }
+  try {
+    await writeFile(`./files/${selectedDatabase}/query_${doctorName.toLowerCase()}.json`, JSON.stringify(results));
     console.log(`Results saved to the following location ./files/${selectedDatabase}/query_${doctorName.toLowerCase()}.json`);
-  });
+  } catch (error) {
+    console.error(`Error writing to ./files/${selectedDatabase}/query_${doctorName.toLowerCase()}.json`, error);
+  }
 }
 
 
-export function treatDataAndSaveInCSV(doctorName) {
-  readFile(`./files/${selectedDatabase}/query_${doctorName.toLowerCase()}.json`, 'utf-8', (err, data) => {
-    if (err) throw err;
+export async function treatDataAndSaveInCSV(doctorName, selectedDatabase) {
+  console.log(selectedDatabase, doctorName)
+  try {
+    const data = await readFile(`./files/${selectedDatabase}/query_${doctorName.toLowerCase()}.json`, 'utf-8');
+    if (!data) {
+        console.error(`JSON file is empty or does not contain data: ./files/${selectedDatabase}/query_${doctorName.toLowerCase()}.json`);
+        return;
+    }
     let jsonData;
     try {
       jsonData = JSON.parse(data);
     } catch (error) {
-      if (error) throw error;
+      console.error('Failed to parse JSON:', error);
+      return;
     }
   
     for (let key in jsonData) {
@@ -50,23 +57,15 @@ export function treatDataAndSaveInCSV(doctorName) {
       const receitUnique = [...new Set(receitPattern)]
       jsonData[key].RECEITUARIO = receitUnique.join(',#');
     }
-    writeFile(
-      `./files/${selectedDatabase}/query_${doctorName.toLowerCase()}.json`,
-      JSON.stringify(jsonData, null, 2),
-      'utf-8',
-      (err) => {
-        if (err) throw err;
-        console.log('Treatment completed!');
-      }
-    );
-    readFile(`./files/${selectedDatabase}/query_${doctorName.toLowerCase()}.json`, 'utf-8', (err, data) => {
-      if (err) throw err;
-      const jsonData = JSON.parse(data);
-      const csvData = convertToCSV(jsonData);
-      writeFile(`./files/${selectedDatabase}/data_${doctorName.toLowerCase()}.csv`, csvData, 'utf-8', (err) => {
-        if (err) throw err;
-        console.log(`CSV saved in the ${selectDB}/data_${doctorName.toLowerCase()}.csv file!`);
-      });
-    });
-  });
+
+    await writeFile(`./files/${selectedDatabase}/query_${doctorName.toLowerCase()}.json`, JSON.stringify(jsonData, null, 2), 'utf-8');
+    console.log('Treatment completed!');
+
+    const csvData = convertToCSV(jsonData);
+    await writeFile(`./files/${selectedDatabase}/data_${doctorName.toLowerCase()}.csv`, csvData, 'utf-8');
+    console.log(`CSV saved in the ./files/${selectedDatabase}/data_${doctorName.toLowerCase()}.csv file!`);
+    return;
+  } catch (error) {
+    console.error('Error:', error);
+  }
 }

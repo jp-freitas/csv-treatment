@@ -1,6 +1,5 @@
 import { createInterface } from 'node:readline';
 import { queryDoctor, queryDataByDoctor, showDatabases } from './utils/databaseOperations.js';
-import { connection } from './utils/connection.js';
 
 const rl = createInterface({
   input: process.stdin,
